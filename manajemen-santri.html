@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IKHTIARUNA - Sistem Absensi Pondok Pesantren</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar.collapsed {
+            width: 80px;
+        }
+        
+        .sidebar.collapsed .sidebar-text {
+            display: none;
+        }
+        
+        .sidebar.collapsed .sidebar-icon {
+            margin-right: 0;
+        }
+        
+        .card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+        
+        .attendance-card {
+            transition: all 0.3s ease;
+        }
+        
+        .attendance-card:hover {
+            transform: scale(1.02);
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .tab-active {
+            border-bottom: 3px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-50">
+        <div class="px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <button id="sidebarToggle" class="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    <div class="ml-4 flex items-center">
+                        <i class="fas fa-mosque text-blue-600 text-2xl mr-3"></i>
+                        <h1 class="text-xl font-bold text-gray-800">IKHTIARUNA</h1>
+                        <span class="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Sistem Absensi Pondok Pesantren</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <button id="notificationBtn" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 relative">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span class="absolute top-0 right-0 h-4 w-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center notification-badge">3</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <img src="https://picsum.photos/seed/user123/40/40.jpg" alt="User" class="h-10 w-10 rounded-full object-cover">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">Ustadz Ahmad</p>
+                            <p class="text-xs text-gray-500">Pengasuh Putra</p>
+                        </div>
+                    </div>
+                    <button id="logoutBtn" class="p-2 rounded-md text-gray-600 hover:bg-gray-100">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar bg-white shadow-md h-screen fixed left-0 top-16 z-40 w-64 overflow-y-auto">
+        <nav class="mt-5 px-2">
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md bg-blue-50 text-blue-700 mb-1">
+                <i class="fas fa-tachometer-alt sidebar-icon mr-3 text-blue-500"></i>
+                <span class="sidebar-text">Dashboard</span>
+            </a>
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 mb-1">
+                <i class="fas fa-users sidebar-icon mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                <span class="sidebar-text">Data Santri</span>
+            </a>
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 mb-1">
+                <i class="fas fa-calendar-check sidebar-icon mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                <span class="sidebar-text">Absensi</span>
+            </a>
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 mb-1">
+                <i class="fas fa-chart-bar sidebar-icon mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                <span class="sidebar-text">Laporan</span>
+            </a>
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 mb-1">
+                <i class="fas fa-clock sidebar-icon mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                <span class="sidebar-text">Jadwal</span>
+            </a>
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 mb-1">
+                <i class="fas fa-user-shield sidebar-icon mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                <span class="sidebar-text">Pengguna</span>
+            </a>
+            <a href="#" class="group flex items-center px-2 py-2 text-base font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 mb-1">
+                <i class="fas fa-cog sidebar-icon mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                <span class="sidebar-text">Pengaturan</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="mainContent" class="ml-64 mt-16 p-6 transition-all duration-300">
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" class="content-section">
+            <!-- Page Header -->
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
+                <p class="text-gray-600">Selamat datang di Sistem Absensi Pondok Pesantren IKHTIARUNA</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Santri</p>
+                            <p class="text-2xl font-bold text-gray-800">245</p>
+                            <p class="text-xs text-green-600 mt-1">
+                                <i class="fas fa-arrow-up"></i> 12 dari bulan lalu
+                            </p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-users text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Hadir Hari Ini</p>
+                            <p class="text-2xl font-bold text-gray-800">228</p>
+                            <p class="text-xs text-gray-500 mt-1">93.1% kehadiran</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-user-check text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Terlambat</p>
+                            <p class="text-2xl font-bold text-gray-800">12</p>
+                            <p class="text-xs text-yellow-600 mt-1">
+                                <i class="fas fa-arrow-up"></i> 3 dari kemarin
+                            </p>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-full">
+                            <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Tidak Hadir</p>
+                            <p class="text-2xl font-bold text-gray-800">5</p>
+                            <p class="text-xs text-red-600 mt-1">
+                                <i class="fas fa-arrow-down"></i> 2 dari kemarin
+                            </p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <i class="fas fa-user-times text-red-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Today's Schedule & Recent Activities -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Today's Schedule -->
+                <div class="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Jadwal Hari Ini</h3>
+                        <span class="text-sm text-gray-500">Senin, 15 Mei 2023</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="attendance-card border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">Sholat Subuh</h4>
+                                    <p class="text-sm text-gray-600">04:30 - 05:00</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Selesai</span>
+                                    <span class="text-sm text-gray-600">235/245 hadir</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="attendance-card border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">Al Qur'an</h4>
+                                    <p class="text-sm text-gray-600">05:30 - 06:30</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Selesai</span>
+                                    <span class="text-sm text-gray-600">230/245 hadir</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="attendance-card border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">Sholat Dzuhur</h4>
+                                    <p class="text-sm text-gray-600">12:00 - 12:30</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Sedang Berlangsung</span>
+                                    <span class="text-sm text-gray-600">128/245 hadir</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="attendance-card border-l-4 border-gray-300 bg-gray-50 p-4 rounded-r-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">Sholat Ashar</h4>
+                                    <p class="text-sm text-gray-600">15:30 - 16:00</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Akan Datang</span>
+                                    <span class="text-sm text-gray-600">0/245 hadir</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="attendance-card border-l-4 border-gray-300 bg-gray-50 p-4 rounded-r-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">Bandongan</h4>
+                                    <p class="text-sm text-gray-600">16:30 - 17:30</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full">Akan Datang</span>
+                                    <span class="text-sm text-gray-600">0/245 hadir</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activities -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Aktivitas Terkini</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-green-100 p-2 rounded-full">
+                                <i class="fas fa-user-check text-green-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-800"><span class="font-medium">Ahmad Rizki</span> hadir Sholat Dzuhur</p>
+                                <p class="text-xs text-gray-500">2 menit yang lalu</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-yellow-100 p-2 rounded-full">
+                                <i class="fas fa-clock text-yellow-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-800"><span class="font-medium">Muhammad Fadli</span> terlambat Sholat Dzuhur</p>
+                                <p class="text-xs text-gray-500">5 menit yang lalu</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-red-100 p-2 rounded-full">
+                                <i class="fas fa-user-times text-red-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-800"><span class="font-medium">Abdul Rahman</span> tidak hadir Al Qur'an</p>
+                                <p class="text-xs text-gray-500">15 menit yang lalu</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-blue-100 p-2 rounded-full">
+                                <i class="fas fa-comment text-blue-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-800">Notifikasi terkirim ke <span class="font-medium">wali Abdul Rahman</span></p>
+                                <p class="text-xs text-gray-500">15 menit yang lalu</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="bg-green-100 p-2 rounded-full">
+                                <i class="fas fa-user-check text-green-600 text-xs"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-gray-800"><span class="font-medium">Siti Nurhaliza</span> hadir Al Qur'an</p>
+                                <p class="text-xs text-gray-500">30 menit yang lalu</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Grafik Kehadiran Mingguan</h3>
+                    <canvas id="weeklyChart" width="400" height="200"></canvas>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Distribusi Kehadiran per Kegiatan</h3>
+                    <canvas id="activityChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Content -->
+        <div id="attendanceContent" class="content-section hidden">
+            <!-- Page Header -->
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Absensi</h2>
+                    <p class="text-gray-600">Kelola absensi santri untuk setiap kegiatan</p>
+                </div>
+                <div class="flex space-x-3">
+                    <select class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option>Pilih Kegiatan</option>
+                        <option>Sholat Subuh</option>
+                        <option>Al Qur'an</option>
+                        <option>Ta'limul Muta'allim</option>
+                        <option>Sholat Dzuhur</option>
+                        <option>Sholat Ashar</option>
+                        <option>Bandongan</option>
+                        <option>Sholat Maghrib</option>
+                        <option>Sorogan</option>
+                        <option>Sholat Isya</option>
+                        <option>MASODIR</option>
+                    </select>
+                    <input type="date" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="2023-05-15">
+                    <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-filter mr-2"></i>Filter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attendance Scanner -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Scanner Absensi</h3>
+                <div class="flex flex-col md:flex-row items-center justify-between">
+                    <div class="w-full md:w-1/2 mb-4 md:mb-0">
+                        <div class="bg-gray-100 rounded-lg p-8 flex flex-col items-center justify-center h-64">
+                            <i class="fas fa-qrcode text-6xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-600 text-center">Tempelkan kartu RFID santri di sini untuk melakukan absensi</p>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-1/2 md:pl-6">
+                        <h4 class="font-medium text-gray-800 mb-3">Informasi Absensi</h4>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="mb-3">
+                                <p class="text-sm text-gray-500">Kegiatan Saat Ini</p>
+                                <p class="font-medium text-gray-800">Sholat Dzuhur</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-sm text-gray-500">Waktu</p>
+                                <p class="font-medium text-gray-800">12:00 - 12:30</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-sm text-gray-500">Status</p>
+                                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Sedang Berlangsung</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Total Hadir</p>
+                                <p class="font-medium text-gray-800">128/245 santri</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Data Absensi</h3>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
+                            <i class="fas fa-file-excel mr-1"></i>Export Excel
+                        </button>
+                        <button class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                            <i class="fas fa-file-pdf mr-1"></i>Export PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Santri</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kamar</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST001</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ahmad Rizki</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VII A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok A 01</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12:02</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Hadir</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST002</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Muhammad Fadli</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VII B</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok A 02</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12:15</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Terlambat</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">3</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST003</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Abdul Rahman</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VIII A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok B 01</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Tidak Hadir</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">4</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST004</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Siti Nurhaliza</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VIII B</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok C 01</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12:05</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Hadir</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">5</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST005</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Fatimah Az-Zahra</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">IX A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok C 02</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Izin</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <p class="text-sm text-gray-700">Menampilkan <span class="font-medium">1</span> hingga <span class="font-medium">5</span> dari <span class="font-medium">245</span> data</p>
+                    <div class="flex space-x-1">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Previous</button>
+                        <button class="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">2</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">3</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Students Data Content -->
+        <div id="studentsContent" class="content-section hidden">
+            <!-- Page Header -->
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Data Santri</h2>
+                    <p class="text-gray-600">Kelola data santri pondok pesantren</p>
+                </div>
+                <button id="addStudentBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Tambah Santri
+                </button>
+            </div>
+
+            <!-- Search and Filter -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <div class="relative">
+                            <input type="text" placeholder="Cari nama, ID, atau kelas santri..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                        </div>
+                    </div>
+                    <select class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option>Semua Kelas</option>
+                        <option>VII A</option>
+                        <option>VII B</option>
+                        <option>VIII A</option>
+                        <option>VIII B</option>
+                        <option>IX A</option>
+                        <option>IX B</option>
+                    </select>
+                    <select class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option>Semua Asrama</option>
+                        <option>Blok A</option>
+                        <option>Blok B</option>
+                        <option>Blok C</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Students Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Daftar Santri</h3>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
+                            <i class="fas fa-file-excel mr-1"></i>Export Excel
+                        </button>
+                        <button class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                            <i class="fas fa-file-pdf mr-1"></i>Export PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Santri</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Lengkap</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kamar</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wali Santri</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. HP Wali</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/student1/100/100.jpg" alt="Foto Santri">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST001</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ahmad Rizki Abdullah</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VII A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok A 01</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bapak Abdullah</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">08123456789</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/student2/100/100.jpg" alt="Foto Santri">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST002</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Muhammad Fadli Rahman</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VII B</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok A 02</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bapak Rahman</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">08234567890</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/student3/100/100.jpg" alt="Foto Santri">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST003</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Abdul Rahman Hakim</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VIII A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok B 01</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bapak Hakim</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">08345678901</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/student4/100/100.jpg" alt="Foto Santri">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST004</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Siti Nurhaliza</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VIII B</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok C 01</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ibu Siti</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">08456789012</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/student5/100/100.jpg" alt="Foto Santri">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST005</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Fatimah Az-Zahra</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">IX A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Blok C 02</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bapak Ahmad</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">08567890123</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <p class="text-sm text-gray-700">Menampilkan <span class="font-medium">1</span> hingga <span class="font-medium">5</span> dari <span class="font-medium">245</span> data</p>
+                    <div class="flex space-x-1">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Previous</button>
+                        <button class="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">2</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">3</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Content -->
+        <div id="reportsContent" class="content-section hidden">
+            <!-- Page Header -->
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Laporan</h2>
+                <p class="text-gray-600">Lihat dan unduh laporan kehadiran santri</p>
+            </div>
+
+            <!-- Report Filters -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Filter Laporan</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Laporan</label>
+                        <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Laporan Harian</option>
+                            <option>Laporan Mingguan</option>
+                            <option>Laporan Bulanan</option>
+                            <option>Laporan Periode</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Dari Tanggal</label>
+                        <input type="date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="2023-05-01">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Sampai Tanggal</label>
+                        <input type="date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="2023-05-15">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Kegiatan</label>
+                        <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Semua Kegiatan</option>
+                            <option>Sholat Subuh</option>
+                            <option>Al Qur'an</option>
+                            <option>Ta'limul Muta'allim</option>
+                            <option>Sholat Dzuhur</option>
+                            <option>Sholat Ashar</option>
+                            <option>Bandongan</option>
+                            <option>Sholat Maghrib</option>
+                            <option>Sorogan</option>
+                            <option>Sholat Isya</option>
+                            <option>MASODIR</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-filter mr-2"></i>Terapkan Filter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Report Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Ringkasan Kehadiran</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Total Kehadiran</span>
+                            <span class="font-medium">3,420</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Hadir</span>
+                            <span class="font-medium text-green-600">3,190 (93.3%)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Terlambat</span>
+                            <span class="font-medium text-yellow-600">150 (4.4%)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Izin</span>
+                            <span class="font-medium text-blue-600">50 (1.5%)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Tidak Hadir</span>
+                            <span class="font-medium text-red-600">30 (0.9%)</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Kehadiran per Kegiatan</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-600">Sholat Subuh</span>
+                                <span class="text-sm font-medium">95%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" style="width: 95%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-600">Al Qur'an</span>
+                                <span class="text-sm font-medium">92%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" style="width: 92%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-600">Sholat Dzuhur</span>
+                                <span class="text-sm font-medium">94%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" style="width: 94%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-600">Sholat Ashar</span>
+                                <span class="text-sm font-medium">93%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" style="width: 93%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm text-gray-600">Bandongan</span>
+                                <span class="text-sm font-medium">91%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" style="width: 91%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Top 5 Santri Terbaik</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-yellow-100 text-yellow-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">1</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">Ahmad Rizki</p>
+                                <p class="text-xs text-gray-500">100% kehadiran</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-gray-100 text-gray-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">2</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">Muhammad Fadli</p>
+                                <p class="text-xs text-gray-500">99% kehadiran</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-orange-100 text-orange-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">3</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">Siti Nurhaliza</p>
+                                <p class="text-xs text-gray-500">98% kehadiran</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-gray-100 text-gray-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">4</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">Fatimah Az-Zahra</p>
+                                <p class="text-xs text-gray-500">97% kehadiran</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-gray-100 text-gray-800 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">5</div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">Abdul Rahman</p>
+                                <p class="text-xs text-gray-500">96% kehadiran</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Detail Laporan Kehadiran</h3>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
+                            <i class="fas fa-file-excel mr-1"></i>Export Excel
+                        </button>
+                        <button class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                            <i class="fas fa-file-pdf mr-1"></i>Export PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Santri</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Kehadiran</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hadir</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terlambat</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Izin</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tidak Hadir</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Persentase</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST001</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ahmad Rizki</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VII A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">140</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">140</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">100%</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST002</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Muhammad Fadli</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VII B</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">140</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">138</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">99%</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">3</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST003</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Abdul Rahman</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VIII A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">140</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">135</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">3</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">96%</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">4</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST004</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Siti Nurhaliza</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">VIII B</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">140</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">137</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">98%</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">5</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ST005</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Fatimah Az-Zahra</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">IX A</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">140</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">136</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">0</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">97%</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <p class="text-sm text-gray-700">Menampilkan <span class="font-medium">1</span> hingga <span class="font-medium">5</span> dari <span class="font-medium">245</span> data</p>
+                    <div class="flex space-x-1">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Previous</button>
+                        <button class="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">2</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">3</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schedule Content -->
+        <div id="scheduleContent" class="content-section hidden">
+            <!-- Page Header -->
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Jadwal Kegiatan</h2>
+                    <p class="text-gray-600">Kelola jadwal kegiatan pondok pesantren</p>
+                </div>
+                <button id="addScheduleBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Tambah Jadwal
+                </button>
+            </div>
+
+            <!-- Schedule Tabs -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px">
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent tab-active" data-tab="senin">
+                            Senin
+                        </button>
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="selasa">
+                            Selasa
+                        </button>
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="rabu">
+                            Rabu
+                        </button>
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="kamis">
+                            Kamis
+                        </button>
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="jumat">
+                            Jumat
+                        </button>
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="sabtu">
+                            Sabtu
+                        </button>
+                        <button class="tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="ahad">
+                            Ahad
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="p-6">
+                    <div id="senin" class="tab-content">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-blue-100 p-3 rounded-full">
+                                        <i class="fas fa-mosque text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Sholat Subuh</h4>
+                                        <p class="text-sm text-gray-600">04:30 - 05:00</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-green-100 p-3 rounded-full">
+                                        <i class="fas fa-book text-green-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Al Qur'an</h4>
+                                        <p class="text-sm text-gray-600">05:30 - 06:30</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-purple-100 p-3 rounded-full">
+                                        <i class="fas fa-graduation-cap text-purple-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Ta'limul Muta'allim</h4>
+                                        <p class="text-sm text-gray-600">07:00 - 08:00</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-blue-100 p-3 rounded-full">
+                                        <i class="fas fa-mosque text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Sholat Dzuhur</h4>
+                                        <p class="text-sm text-gray-600">12:00 - 12:30</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-blue-100 p-3 rounded-full">
+                                        <i class="fas fa-mosque text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Sholat Ashar</h4>
+                                        <p class="text-sm text-gray-600">15:30 - 16:00</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-yellow-100 p-3 rounded-full">
+                                        <i class="fas fa-chalkboard-teacher text-yellow-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Bandongan</h4>
+                                        <p class="text-sm text-gray-600">16:30 - 17:30</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-blue-100 p-3 rounded-full">
+                                        <i class="fas fa-mosque text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Sholat Maghrib</h4>
+                                        <p class="text-sm text-gray-600">18:00 - 18:30</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-indigo-100 p-3 rounded-full">
+                                        <i class="fas fa-book-open text-indigo-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Sorogan</h4>
+                                        <p class="text-sm text-gray-600">19:00 - 20:00</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-blue-100 p-3 rounded-full">
+                                        <i class="fas fa-mosque text-blue-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">Sholat Isya</h4>
+                                        <p class="text-sm text-gray-600">20:00 - 20:30</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <div class="bg-red-100 p-3 rounded-full">
+                                        <i class="fas fa-book text-red-600"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium text-gray-800">MASODIR</h4>
+                                        <p class="text-sm text-gray-600">21:00 - 22:00</p>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="p-2 text-blue-600 hover:bg-blue-100 rounded">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="p-2 text-red-600 hover:bg-red-100 rounded">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Other day tabs would have similar content -->
+                    <div id="selasa" class="tab-content hidden">
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">Jadwal untuk hari Selasa akan ditampilkan di sini</p>
+                        </div>
+                    </div>
+                    
+                    <div id="rabu" class="tab-content hidden">
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">Jadwal untuk hari Rabu akan ditampilkan di sini</p>
+                        </div>
+                    </div>
+                    
+                    <div id="kamis" class="tab-content hidden">
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">Jadwal untuk hari Kamis akan ditampilkan di sini</p>
+                        </div>
+                    </div>
+                    
+                    <div id="jumat" class="tab-content hidden">
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">Jadwal untuk hari Jumat akan ditampilkan di sini</p>
+                        </div>
+                    </div>
+                    
+                    <div id="sabtu" class="tab-content hidden">
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">Jadwal untuk hari Sabtu akan ditampilkan di sini</p>
+                        </div>
+                    </div>
+                    
+                    <div id="ahad" class="tab-content hidden">
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">Jadwal untuk hari Ahad akan ditampilkan di sini</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Content -->
+        <div id="usersContent" class="content-section hidden">
+            <!-- Page Header -->
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Pengguna</h2>
+                    <p class="text-gray-600">Kelola pengguna sistem absensi</p>
+                </div>
+                <button id="addUserBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Tambah Pengguna
+                </button>
+            </div>
+
+            <!-- User Roles -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Admin</h3>
+                        <div class="bg-blue-100 p-2 rounded-full">
+                            <i class="fas fa-user-shield text-blue-600"></i>
+                        </div>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800 mb-2">3</p>
+                    <p class="text-sm text-gray-600">Pengguna dengan role Admin</p>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Ustadz/Musyrif</h3>
+                        <div class="bg-green-100 p-2 rounded-full">
+                            <i class="fas fa-chalkboard-teacher text-green-600"></i>
+                        </div>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800 mb-2">12</p>
+                    <p class="text-sm text-gray-600">Pengguna dengan role Ustadz/Musyrif</p>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Orang Tua</h3>
+                        <div class="bg-purple-100 p-2 rounded-full">
+                            <i class="fas fa-user-friends text-purple-600"></i>
+                        </div>
+                    </div>
+                    <p class="text-3xl font-bold text-gray-800 mb-2">230</p>
+                    <p class="text-sm text-gray-600">Pengguna dengan role Orang Tua</p>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Daftar Pengguna</h3>
+                    <div class="flex space-x-2">
+                        <select class="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Semua Role</option>
+                            <option>Admin</option>
+                            <option>Ustadz/Musyrif</option>
+                            <option>Orang Tua</option>
+                        </select>
+                        <button class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
+                            <i class="fas fa-file-excel mr-1"></i>Export Excel
+                        </button>
+                        <button class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition">
+                            <i class="fas fa-file-pdf mr-1"></i>Export PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">1</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/admin1/100/100.jpg" alt="Foto Pengguna">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ustadz Ahmad</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ustadz_ahmad</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ahmad@ikhtiarna.sch.id</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Admin</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Aktif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/ustadz1/100/100.jpg" alt="Foto Pengguna">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ustadz Muhammad</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ustadz_muhammad</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">muhammad@ikhtiarna.sch.id</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Ustadz/Musyrif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Aktif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">3</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/parent1/100/100.jpg" alt="Foto Pengguna">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Bapak Abdullah</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">abdullah_parent</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">abdullah.parent@email.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">Orang Tua</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Aktif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">4</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/parent2/100/100.jpg" alt="Foto Pengguna">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ibu Siti</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">siti_parent</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">siti.parent@email.com</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">Orang Tua</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Aktif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">5</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/seed/ustadz2/100/100.jpg" alt="Foto Pengguna">
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Ustadz Rahman</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ustadz_rahman</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">rahman@ikhtiarna.sch.id</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Ustadz/Musyrif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Tidak Aktif</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button class="text-blue-600 hover:text-blue-900 mr-2">Detail</button>
+                                    <button class="text-green-600 hover:text-green-900 mr-2">Edit</button>
+                                    <button class="text-red-600 hover:text-red-900">Hapus</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <p class="text-sm text-gray-700">Menampilkan <span class="font-medium">1</span> hingga <span class="font-medium">5</span> dari <span class="font-medium">245</span> data</p>
+                    <div class="flex space-x-1">
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Previous</button>
+                        <button class="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">2</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">3</button>
+                        <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div id="settingsContent" class="content-section hidden">
+            <!-- Page Header -->
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Pengaturan</h2>
+                <p class="text-gray-600">Konfigurasi sistem absensi</p>
+            </div>
+
+            <!-- Settings Tabs -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px">
+                        <button class="settings-tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent settings-tab-active" data-tab="general">
+                            Umum
+                        </button>
+                        <button class="settings-tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="notification">
+                            Notifikasi
+                        </button>
+                        <button class="settings-tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="attendance">
+                            Absensi
+                        </button>
+                        <button class="settings-tab-btn py-4 px-6 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent" data-tab="system">
+                            Sistem
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="p-6">
+                    <!-- General Settings -->
+                    <div id="general" class="settings-tab-content">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Pengaturan Umum</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nama Pondok Pesantren</label>
+                                <input type="text" value="Pondok Pesantren IKHTIARUNA" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
+                                <textarea rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">Jl. Pendidikan No. 123, Kecamatan Sukamaju, Kabupaten Sejahtera</textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nomor Telepon</label>
+                                <input type="text" value="(021) 1234567" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                <input type="email" value="info@ikhtiarna.sch.id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Logo Pondok</label>
+                                <div class="flex items-center space-x-4">
+                                    <img src="https://picsum.photos/seed/logo/100/100.jpg" alt="Logo" class="h-20 w-20 object-cover rounded">
+                                    <button class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                                        <i class="fas fa-upload mr-2"></i>Upload Logo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-save mr-2"></i>Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Notification Settings -->
+                    <div id="notification" class="settings-tab-content hidden">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Pengaturan Notifikasi</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">WhatsApp Gateway API</label>
+                                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option>Fonnte</option>
+                                    <option>Chat API</option>
+                                    <option>Twilio</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                                <input type="password" value="****************************************" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nomor WhatsApp Pengirim</label>
+                                <input type="text" value="6281234567890" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Template Pesan</label>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Pesan Kehadiran</label>
+                                        <textarea rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">Assalamu'alaikum Bapak/Ibu, Ananda [Nama Santri] hadir pada [Kegiatan] hari ini pukul [Waktu]. Terima kasih.</textarea>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Pesan Keterlambatan</label>
+                                        <textarea rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">Assalamu'alaikum Bapak/Ibu, Ananda [Nama Santri] terlambat pada [Kegiatan] hari ini pukul [Waktu]. Mohon diperhatikan.</textarea>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Pesan Ketidakhadiran</label>
+                                        <textarea rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">Assalamu'alaikum Bapak/Ibu, Ananda [Nama Santri] tidak hadir pada [Kegiatan] hari ini pukul [Waktu]. Mohon diperhatikan dan dinasihati saat tanggal kunjungan.</textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="autoNotification" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                <label for="autoNotification" class="ml-2 block text-sm text-gray-700">Aktifkan notifikasi otomatis ke orang tua</label>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-save mr-2"></i>Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Attendance Settings -->
+                    <div id="attendance" class="settings-tab-content hidden">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Pengaturan Absensi</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Toleransi Keterlambatan (menit)</label>
+                                <input type="number" value="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Metode Absensi</label>
+                                <div class="space-y-2">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="rfidMethod" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                        <label for="rfidMethod" class="ml-2 block text-sm text-gray-700">RFID / Kartu ID</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="fingerprintMethod" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="fingerprintMethod" class="ml-2 block text-sm text-gray-700">Sidik Jari</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="faceMethod" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="faceMethod" class="ml-2 block text-sm text-gray-700">Pengenalan Wajah</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="manualMethod" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="manualMethod" class="ml-2 block text-sm text-gray-700">Manual (Input oleh Ustadz/Musyrif)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Status Default untuk Tidak Hadir</label>
+                                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option>Alfa/Tidak Hadir</option>
+                                    <option>Izin</option>
+                                    <option>Sakit</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="autoMarkAbsent" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                <label for="autoMarkAbsent" class="ml-2 block text-sm text-gray-700">Tandai otomatis sebagai tidak hadir setelah waktu kegiatan berakhir</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="allowLateCheckIn" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                <label for="allowLateCheckIn" class="ml-2 block text-sm text-gray-700">Izinkan check-in setelah waktu toleransi keterlambatan</label>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-save mr-2"></i>Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- System Settings -->
+                    <div id="system" class="settings-tab-content hidden">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Pengaturan Sistem</h3>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Mode Sistem</label>
+                                <div class="space-y-2">
+                                    <div class="flex items-center">
+                                        <input type="radio" id="onlineMode" name="systemMode" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300" checked>
+                                        <label for="onlineMode" class="ml-2 block text-sm text-gray-700">Online (Memerlukan koneksi internet)</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="offlineMode" name="systemMode" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                                        <label for="offlineMode" class="ml-2 block text-sm text-gray-700">Offline (Data tersimpan lokal)</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="radio" id="hybridMode" name="systemMode" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                                        <label for="hybridMode" class="ml-2 block text-sm text-gray-700">Hybrid (Sinkronisasi otomatis saat online)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Backup Otomatis</label>
+                                <div class="space-y-2">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="dailyBackup" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                        <label for="dailyBackup" class="ml-2 block text-sm text-gray-700">Backup harian</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="weeklyBackup" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                        <label for="weeklyBackup" class="ml-2 block text-sm text-gray-700">Backup mingguan</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="monthlyBackup" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                        <label for="monthlyBackup" class="ml-2 block text-sm text-gray-700">Backup bulanan</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Zona Waktu</label>
+                                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option>WIB (Waktu Indonesia Barat)</option>
+                                    <option>WITA (Waktu Indonesia Tengah)</option>
+                                    <option>WIT (Waktu Indonesia Timur)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Bahasa</label>
+                                <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option>Bahasa Indonesia</option>
+                                    <option>English</option>
+                                    <option>العربية</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Versi Sistem</label>
+                                <div class="bg-gray-100 p-3 rounded-lg">
+                                    <p class="text-sm text-gray-700">IKHTIARUNA v1.0.0</p>
+                                    <p class="text-xs text-gray-500">Terakhir diperbarui: 15 Mei 2023</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-between">
+                            <button class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                                <i class="fas fa-trash mr-2"></i>Hapus Semua Data
+                            </button>
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-save mr-2"></i>Simpan Perubahan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Student Modal -->
+    <div id="addStudentModal" class="modal">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800">Tambah Santri Baru</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ID Santri</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: ST001">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Ahmad Rizki">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Kelamin</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option>Laki-laki</option>
+                                <option>Perempuan</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+                            <input type="date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                            <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option>VII A</option>
+                                <option>VII B</option>
+                                <option>VIII A</option>
+                                <option>VIII B</option>
+                                <option>IX A</option>
+                                <option>IX B</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Kamar</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Blok A 01">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nama Wali</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Bapak Abdullah">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">No. HP Wali</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: 08123456789">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email Wali</label>
+                            <input type="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: wali@email.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nomor RFID</label>
+                            <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: 1234567890">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+                        <textarea rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Alamat lengkap santri"></textarea>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Foto Santri</label>
+                        <div class="flex items-center space-x-4">
+                            <img src="https://picsum.photos/seed/newstudent/100/100.jpg" alt="Foto" class="h-20 w-20 object-cover rounded">
+                            <button type="button" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                                <i class="fas fa-upload mr-2"></i>Upload Foto
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button class="close-modal px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">Batal</button>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Schedule Modal -->
+    <div id="addScheduleModal" class="modal">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800">Tambah Jadwal</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hari</label>
+                        <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Senin</option>
+                            <option>Selasa</option>
+                            <option>Rabu</option>
+                            <option>Kamis</option>
+                            <option>Jumat</option>
+                            <option>Sabtu</option>
+                            <option>Ahad</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Kegiatan</label>
+                        <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Sholat Subuh</option>
+                            <option>Al Qur'an</option>
+                            <option>Ta'limul Muta'allim</option>
+                            <option>Sholat Dzuhur</option>
+                            <option>Sholat Ashar</option>
+                            <option>Bandongan</option>
+                            <option>Sholat Maghrib</option>
+                            <option>Sorogan</option>
+                            <option>Sholat Isya</option>
+                            <option>MASODIR</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Waktu Mulai</label>
+                            <input type="time" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Waktu Selesai</label>
+                            <input type="time" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
+                        <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Masjid Jami'">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Pengajar/Pengasuh</label>
+                        <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Ustadz Ahmad">
+                    </div>
+                </form>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button class="close-modal px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">Batal</button>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800">Tambah Pengguna</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <form>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                        <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Ustadz Ahmad">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: ustadz_ahmad">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: ahmad@ikhtiarna.sch.id">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Admin</option>
+                            <option>Ustadz/Musyrif</option>
+                            <option>Orang Tua</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option>Aktif</option>
+                            <option>Tidak Aktif</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button class="close-modal px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">Batal</button>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Simpan
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div id="notificationModal" class="modal">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-semibold text-gray-800">Notifikasi</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div class="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
+                        <div class="bg-red-100 p-2 rounded-full">
+                            <i class="fas fa-user-times text-red-600 text-xs"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800"><span class="font-medium">Abdul Rahman</span> tidak hadir pada Sholat Ashar</p>
+                            <p class="text-xs text-gray-500">15 menit yang lalu</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg">
+                        <div class="bg-yellow-100 p-2 rounded-full">
+                            <i class="fas fa-clock text-yellow-600 text-xs"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800"><span class="font-medium">Muhammad Fadli</span> terlambat Sholat Dzuhur</p>
+                            <p class="text-xs text-gray-500">30 menit yang lalu</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
+                        <div class="bg-blue-100 p-2 rounded-full">
+                            <i class="fas fa-comment text-blue-600 text-xs"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm text-gray-800">Notifikasi terkirim ke <span class="font-medium">wali Abdul Rahman</span></p>
+                            <p class="text-xs text-gray-500">30 menit yang lalu</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+                <button class="close-modal px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Tandai semua dibaca</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize charts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Weekly Chart
+            const weeklyCtx = document.getElementById('weeklyChart').getContext('2d');
+            const weeklyChart = new Chart(weeklyCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+                    datasets: [{
+                        label: 'Hadir',
+                        data: [235, 230, 240, 238, 232, 225, 220],
+                        borderColor: 'rgb(34, 197, 94)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.3
+                    }, {
+                        label: 'Terlambat',
+                        data: [5, 8, 3, 5, 8, 12, 15],
+                        borderColor: 'rgb(250, 204, 21)',
+                        backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                        tension: 0.3
+                    }, {
+                        label: 'Tidak Hadir',
+                        data: [5, 7, 2, 2, 5, 8, 10],
+                        borderColor: 'rgb(239, 68, 68)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Activity Chart
+            const activityCtx = document.getElementById('activityChart').getContext('2d');
+            const activityChart = new Chart(activityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Sholat Subuh', 'Al Qur\'an', 'Sholat Dzuhur', 'Sholat Ashar', 'Bandongan', 'Sholat Maghrib', 'Sorogan', 'Sholat Isya', 'MASODIR'],
+                    datasets: [{
+                        data: [95, 92, 94, 93, 91, 96, 90, 94, 89],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(250, 204, 21, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(99, 102, 241, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(239, 68, 68, 0.8)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+        });
+
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            
+            sidebar.classList.toggle('collapsed');
+            
+            if (sidebar.classList.contains('collapsed')) {
+                mainContent.classList.remove('ml-64');
+                mainContent.classList.add('ml-20');
+            } else {
+                mainContent.classList.remove('ml-20');
+                mainContent.classList.add('ml-64');
+            }
+        });
+
+        // Navigation
+        const navLinks = document.querySelectorAll('nav a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Remove active class from all links
+                navLinks.forEach(l => {
+                    l.classList.remove('bg-blue-50', 'text-blue-700');
+                    l.classList.add('text-gray-600');
+                });
+                
+                // Add active class to clicked link
+                this.classList.remove('text-gray-600');
+                this.classList.add('bg-blue-50', 'text-blue-700');
+                
+                // Hide all content sections
+                const contentSections = document.querySelectorAll('.content-section');
+                contentSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+                
+                // Show corresponding content based on link text
+                const linkText = this.textContent.trim();
+                if (linkText === 'Dashboard') {
+                    document.getElementById('dashboardContent').classList.remove('hidden');
+                } else if (linkText === 'Data Santri') {
+                    document.getElementById('studentsContent').classList.remove('hidden');
+                } else if (linkText === 'Absensi') {
+                    document.getElementById('attendanceContent').classList.remove('hidden');
+                } else if (linkText === 'Laporan') {
+                    document.getElementById('reportsContent').classList.remove('hidden');
+                } else if (linkText === 'Jadwal') {
+                    document.getElementById('scheduleContent').classList.remove('hidden');
+                } else if (linkText === 'Pengguna') {
+                    document.getElementById('usersContent').classList.remove('hidden');
+                } else if (linkText === 'Pengaturan') {
+                    document.getElementById('settingsContent').classList.remove('hidden');
+                }
+            });
+        });
+
+        // Tab functionality for schedule
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tab');
+                
+                // Remove active class from all tabs
+                tabBtns.forEach(b => {
+                    b.classList.remove('tab-active');
+                });
+                
+                // Add active class to clicked tab
+                this.classList.add('tab-active');
+                
+                // Hide all tab contents
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // Show corresponding tab content
+                document.getElementById(tabId).classList.remove('hidden');
+            });
+        });
+
+        // Settings tab functionality
+        const settingsTabBtns = document.querySelectorAll('.settings-tab-btn');
+        settingsTabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tab');
+                
+                // Remove active class from all tabs
+                settingsTabBtns.forEach(b => {
+                    b.classList.remove('settings-tab-active');
+                });
+                
+                // Add active class to clicked tab
+                this.classList.add('settings-tab-active');
+                
+                // Hide all tab contents
+                const tabContents = document.querySelectorAll('.settings-tab-content');
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // Show corresponding tab content
+                document.getElementById(tabId).classList.remove('hidden');
+            });
+        });
+
+        // Modal functionality
+        const modals = document.querySelectorAll('.modal');
+        const closeBtns = document.querySelectorAll('.close-modal');
+        
+        // Open add student modal
+        document.getElementById('addStudentBtn').addEventListener('click', function() {
+            document.getElementById('addStudentModal').classList.add('active');
+        });
+        
+        // Open add schedule modal
+        document.getElementById('addScheduleBtn').addEventListener('click', function() {
+            document.getElementById('addScheduleModal').classList.add('active');
+        });
+        
+        // Open add user modal
+        document.getElementById('addUserBtn').addEventListener('click', function() {
+            document.getElementById('addUserModal').classList.add('active');
+        });
+        
+        // Open notification modal
+        document.getElementById('notificationBtn').addEventListener('click', function() {
+            document.getElementById('notificationModal').classList.add('active');
+        });
+        
+        // Close modals
+        closeBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                modals.forEach(modal => {
+                    modal.classList.remove('active');
+                });
+            });
+        });
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', function(event) {
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
+                // In a real application, this would handle the logout process
+                alert('Anda telah keluar dari sistem. Halaman akan dialihkan ke halaman login.');
+                // window.location.href = 'login.html';
+            }
+        });
+
+        // Simulate RFID scan
+        function simulateRFIDScan() {
+            const studentId = 'ST001'; // Simulate scanning a student's RFID card
+            const studentName = 'Ahmad Rizki';
+            const activity = 'Sholat Dzuhur';
+            const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-20 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50 flex items-center space-x-3';
+            notification.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <p class="font-medium">Absensi Berhasil</p>
+                    <p class="text-sm">${studentName} hadir pada ${activity} pukul ${time}</p>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+            
+            // In a real application, this would send the data to the server
+            console.log(`RFID Scan: ${studentId} - ${studentName} - ${activity} - ${time}`);
+        }
+
+        // Simulate sending WhatsApp notification
+        function sendWhatsAppNotification(studentName, activity, status, time) {
+            const parentPhone = '6281234567890'; // Parent's phone number
+            let message = '';
+            
+            if (status === 'hadir') {
+                message = `Assalamu'alaikum Bapak/Ibu, Ananda ${studentName} hadir pada ${activity} hari ini pukul ${time}. Terima kasih.`;
+            } else if (status === 'terlambat') {
+                message = `Assalamu'alaikum Bapak/Ibu, Ananda ${studentName} terlambat pada ${activity} hari ini pukul ${time}. Mohon diperhatikan.`;
+            } else if (status === 'tidak hadir') {
+                message = `Assalamu'alaikum Bapak/Ibu, Ananda ${studentName} tidak hadir pada ${activity} hari ini pukul ${time}. Mohon diperhatikan dan dinasihati saat tanggal kunjungan.`;
+            }
+            
+            // In a real application, this would use the WhatsApp Gateway API
+            console.log(`Sending WhatsApp to ${parentPhone}: ${message}`);
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-20 right-4 bg-blue-500 text-white p-4 rounded-lg shadow-lg z-50 flex items-center space-x-3';
+            notification.innerHTML = `
+                <i class="fas fa-comment"></i>
+                <div>
+                    <p class="font-medium">Notifikasi WhatsApp Terkirim</p>
+                    <p class="text-sm">Ke wali ${studentName} untuk ${activity}</p>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Simulate periodic RFID scans for demo purposes
+        setInterval(() => {
+            const random = Math.random();
+            if (random > 0.7) { // 30% chance of a scan
+                simulateRFIDScan();
+                
+                // Randomly decide if a notification should be sent
+                const notificationRandom = Math.random();
+                if (notificationRandom > 0.5) {
+                    const statuses = ['hadir', 'terlambat', 'tidak hadir'];
+                    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+                    const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    sendWhatsAppNotification('Ahmad Rizki', 'Sholat Dzuhur', randomStatus, time);
+                }
+            }
+        }, 10000); // Check every 10 seconds
+    </script>
+</body>
+</html>
